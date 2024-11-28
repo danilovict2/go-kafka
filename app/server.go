@@ -33,6 +33,6 @@ func main() {
 			break
 		}
 
-		conn.Write([]byte{0, 0, 0, 0, 0, 0, 0, 7})
+		conn.Write(append([]byte{0, 0, 0, 0}, buf[8:12]...))
 	}
 }
