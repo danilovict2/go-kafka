@@ -33,6 +33,8 @@ func main() {
 			break
 		}
 
-		conn.Write(append([]byte{0, 0, 0, 0}, buf[8:12]...))
+		requestMessage := ParseRequestMessage(buf)
+		responseMessage := BuildResponseMessage(requestMessage)
+		conn.Write(responseMessage.Marshal())
 	}
 }
