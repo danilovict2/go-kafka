@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -35,6 +36,11 @@ func main() {
 
 		requestMessage := ParseRequestMessage(buf)
 		responseMessage := BuildResponseMessage(requestMessage)
-		conn.Write(responseMessage.Marshal())
+		Send(conn, responseMessage.Marshal())
 	}
+}
+
+func Send(conn net.Conn, response []byte) {
+	binary.Write(conn, binary.BigEndian, int32(len(response)))
+	binary.Write(conn, binary.BigEndian, response)
 }

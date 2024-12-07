@@ -3,9 +3,17 @@ package main
 import "encoding/binary"
 
 type ResponseMessage struct {
-	size         uint32
-	corelationID uint32
-	errorCode    uint16
+	corelationID   uint32
+	errorCode      uint16
+	numOfAPIKeys   uint8
+	apiVersions    ApiVersionsResponse
+	throttleTimeMS uint32
+}
+
+type ApiVersionsResponse struct {
+	apiKey     uint16
+	minVersion uint16
+	maxVersion uint16
 }
 
 func BuildResponseMessage(request RequestMessage) ResponseMessage {
@@ -15,25 +23,32 @@ func BuildResponseMessage(request RequestMessage) ResponseMessage {
 	}
 
 	return ResponseMessage{
-		size: 0,
 		corelationID: request.corelationID,
-		errorCode: errorCode,
+		errorCode:    errorCode,
+		numOfAPIKeys: 2,
+		apiVersions: ApiVersionsResponse{
+			apiKey:     18,
+			minVersion: 3,
+			maxVersion: 4,
+		},
+		throttleTimeMS: 0,
 	}
 }
 
 func (r ResponseMessage) Marshal() []byte {
-	size := make([]byte, 4)
-	corelationID := make([]byte, 4)
-	errorCode := make([]byte, 2)
+	ret := make([]byte, 19)
 
-	binary.BigEndian.PutUint32(size, r.size)
-	binary.BigEndian.PutUint32(corelationID, r.corelationID)
-	binary.BigEndian.PutUint16(errorCode, r.errorCode)
+	binary.BigEndian.PutUint32(ret, r.corelationID)
+	binary.BigEndian.PutUint16(ret[4:], r.errorCode)
 
-	ret := make([]byte, 0)
-	ret = append(ret, size...)
-	ret = append(ret, corelationID...)
-	ret = append(ret, errorCode...)
-	
+	ret[6] = r.numOfAPIKeys
+	binary.BigEndian.PutUint16(ret[7:], r.apiVersions.apiKey)
+	binary.BigEndian.PutUint16(ret[9:], r.apiVersions.minVersion)
+	binary.BigEndian.PutUint16(ret[11:], r.apiVersions.maxVersion)
+
+	ret[13] = 0 // _tagged_fields
+	binary.BigEndian.PutUint32(ret[14:], r.throttleTimeMS)
+	ret[18] = 0 // _tagged_fields
+
 	return ret
 }
