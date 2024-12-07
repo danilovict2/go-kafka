@@ -56,11 +56,12 @@ func (s *Server) Handle(conn net.Conn) {
 
 		requestMessage := ParseRequestMessage(buf)
 		responseMessage := BuildResponseMessage(requestMessage)
+		fmt.Println(responseMessage, responseMessage.Marshal())
 		Send(conn, responseMessage.Marshal())
 	}
 }
 
-func Send(conn net.Conn, response []byte) {
-	binary.Write(conn, binary.BigEndian, int32(len(response)))
-	binary.Write(conn, binary.BigEndian, response)
+func Send(conn net.Conn, message []byte) {
+	binary.Write(conn, binary.BigEndian, int32(len(message)))
+	binary.Write(conn, binary.BigEndian, message)
 }
