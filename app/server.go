@@ -9,6 +9,13 @@ import (
 	"os"
 )
 
+type Server struct {
+	listener net.Listener
+}
+
+func NewServer() *Server {
+	return &Server{}
+}
 
 func main() {
 	l, err := net.Listen("tcp", "0.0.0.0:9092")
@@ -17,15 +24,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println("Error accepting connection: ", err.Error())
-		os.Exit(1)
-	}
+	server := NewServer()
+	server.listener = l
+	server.Accept()
+}
 
+func (s *Server) Accept() {
+	for {
+		conn, err := s.listener.Accept()
+		if err != nil {
+			fmt.Println("Error accepting connection: ", err.Error())
+			os.Exit(1)
+		}
+
+		go s.Handle(conn)
+	}
+}
+
+func (s *Server) Handle(conn net.Conn) {
+	defer conn.Close()
 	for {
 		buf := make([]byte, 1024)
-		_, err = conn.Read(buf)
+		_, err := conn.Read(buf)
 		if errors.Is(err, io.EOF) {
 			fmt.Println("Client closed connections at:", conn.RemoteAddr())
 			break
