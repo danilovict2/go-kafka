@@ -1,21 +1,24 @@
 package main
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"fmt"
 
-type RequestMessage struct {
-	size         uint32
-	apiKey       uint16
-	apiVersion   uint16
-	corelationID uint32
-}
+	"github.com/codecrafters-io/kafka-starter-go/internal/api"
+)
 
-func ParseRequestMessage(request []byte) RequestMessage {
-	ret := RequestMessage{
-		size: binary.BigEndian.Uint32(request[0:4]),
-		apiKey: binary.BigEndian.Uint16(request[4:6]),
-		apiVersion: binary.BigEndian.Uint16(request[6:8]),
-		corelationID: binary.BigEndian.Uint32(request[8:12]),
+func parseRequest(request []byte) (api.Deserializable, error) {
+	apiKey := binary.BigEndian.Uint16(request[4:6])
+	var req api.Deserializable = nil
+	switch apiKey {
+	case uint16(api.API_VERSIONS):
+		req = &api.APIVersionsReq{}
+	case uint16(api.DESCRIBE_TOPIC_PARTITIONS):
+		req = &api.DescribeTopicPartitionsReq{}
+	default:
+		return nil, fmt.Errorf("unknown api key: %v", apiKey)
 	}
 
-	return ret
+	req.Deserialize(request)
+	return req, nil
 }

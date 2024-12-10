@@ -1,93 +1,22 @@
 package main
 
-import "encoding/binary"
+import (
+	"fmt"
 
-type ResponseMessage struct {
-	corelationID   uint32
-	errorCode      uint16
-	numOfAPIKeys   uint8
-	APIKeys        []APIKey
-	throttleTimeMS uint32
-}
+	"github.com/codecrafters-io/kafka-starter-go/internal/api"
+)
 
-type APIKey interface {
-	Marshal() []byte
-}
+func parseResponse(req api.Deserializable) (api.Serializable, error) {
+	var resp api.Serializable = nil
 
-type ApiVersions struct {
-	apiKey     uint16
-	minVersion uint16
-	maxVersion uint16
-}
-
-type DescribeTopicPartitions struct {
-	apiKey     uint16
-	minVersion uint16
-	maxVersion uint16
-}
-
-func BuildResponseMessage(request RequestMessage) ResponseMessage {
-	var errorCode uint16 = 0
-	if request.apiVersion > 4 {
-		errorCode = 35
+	switch request := req.(type) {
+	case *api.APIVersionsReq:
+		resp = api.HandleApiVersionsReq(request);
+	case *api.DescribeTopicPartitionsReq:
+		resp = api.HandleDescribeTopicPartitionsReq(request)
+	default:
+		return nil, fmt.Errorf("invalid request type: %T", resp)
 	}
 
-	return ResponseMessage{
-		corelationID:   request.corelationID,
-		errorCode:      errorCode,
-		numOfAPIKeys:   2,
-		APIKeys: []APIKey{
-			ApiVersions{
-				apiKey: 18,
-				minVersion: 3,
-				maxVersion: 4,
-			},
-			DescribeTopicPartitions{
-				apiKey: 75,
-				minVersion: 0,
-				maxVersion: 0,
-			},
-		},
-		throttleTimeMS: 0,
-	}
-}
-
-func (r ResponseMessage) Marshal() []byte {
-	ret := make([]byte, 7)
-
-	binary.BigEndian.PutUint32(ret, r.corelationID)
-	binary.BigEndian.PutUint16(ret[4:], r.errorCode)
-
-	ret[6] = r.numOfAPIKeys + 1
-	for i := 0; i < int(r.numOfAPIKeys); i++ {
-		apiKey := r.APIKeys[i].Marshal()
-		ret = append(ret, apiKey...)
-		ret = append(ret, 0) // _tagged_fields
-	}
-
-	throttleTimeMS := make([]byte, 4)
-	binary.BigEndian.PutUint32(throttleTimeMS, r.throttleTimeMS)
-
-	ret = append(ret, throttleTimeMS...)
-	ret = append(ret, 0) // _tagged_fields
-
-	return ret
-}
-
-func (apiKey ApiVersions) Marshal() []byte {
-	ret := make([]byte, 6)
-	binary.BigEndian.PutUint16(ret, apiKey.apiKey)
-	binary.BigEndian.PutUint16(ret[2:], apiKey.minVersion)
-	binary.BigEndian.PutUint16(ret[4:], apiKey.maxVersion)
-
-	return ret
-}
-
-func (apiKey DescribeTopicPartitions) Marshal() []byte {
-	ret := make([]byte, 6)
-	binary.BigEndian.PutUint16(ret, apiKey.apiKey)
-	binary.BigEndian.PutUint16(ret[2:], apiKey.minVersion)
-	binary.BigEndian.PutUint16(ret[4:], apiKey.maxVersion)
-
-	return ret
+	return resp, nil
 }

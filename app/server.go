@@ -54,10 +54,19 @@ func (s *Server) Handle(conn net.Conn) {
 			break
 		}
 
-		requestMessage := ParseRequestMessage(buf)
-		responseMessage := BuildResponseMessage(requestMessage)
-		fmt.Println(responseMessage, responseMessage.Marshal())
-		Send(conn, responseMessage.Marshal())
+		request, err := parseRequest(buf)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		response, err := parseResponse(request)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		Send(conn, response.Serialize())
 	}
 }
 
