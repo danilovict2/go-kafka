@@ -4,6 +4,7 @@ type API_KEY uint16
 type API_ERROR_CODE uint16
 
 const (
+	FETCH                     API_KEY = 1
 	API_VERSIONS              API_KEY = 18
 	DESCRIBE_TOPIC_PARTITIONS API_KEY = 75
 )

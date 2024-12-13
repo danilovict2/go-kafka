@@ -25,7 +25,7 @@ type APIVersionsResp struct {
 }
 
 type APIVersions struct {
-	apiKey     uint16
+	apiKey     API_KEY
 	minVersion uint16
 	maxVersion uint16
 }
@@ -40,7 +40,7 @@ func (resp *APIVersionsResp) Serialize() []byte {
 
 	for i := 0; i < int(resp.numOfAPIKeys); i++ {
 		apiKey := make([]byte, 6)
-		binary.BigEndian.PutUint16(apiKey, resp.APIVersions[i].apiKey)
+		binary.BigEndian.PutUint16(apiKey, uint16(resp.APIVersions[i].apiKey))
 		binary.BigEndian.PutUint16(apiKey[2:], resp.APIVersions[i].minVersion)
 		binary.BigEndian.PutUint16(apiKey[4:], resp.APIVersions[i].maxVersion)
 
@@ -66,17 +66,22 @@ func HandleApiVersionsReq(req *APIVersionsReq) *APIVersionsResp {
 	return &APIVersionsResp{
 		corelationID:   req.corelationID,
 		errorCode:      errorCode,
-		numOfAPIKeys:   2,
+		numOfAPIKeys:   3,
 		APIVersions: []APIVersions{
 			{
-				apiKey: 18,
+				apiKey: API_VERSIONS,
 				minVersion: 3,
 				maxVersion: 4,
 			},
 			{
-				apiKey: 75,
+				apiKey: DESCRIBE_TOPIC_PARTITIONS,
 				minVersion: 0,
 				maxVersion: 0,
+			},
+			{
+				apiKey: FETCH,
+				minVersion: 0,
+				maxVersion: 16,
 			},
 		},
 		throttleTimeMS: 0,
