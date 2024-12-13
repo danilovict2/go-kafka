@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/binary"
+	"slices"
 )
 
 type DescribeTopicPartitionsReq struct {
@@ -9,8 +10,8 @@ type DescribeTopicPartitionsReq struct {
 	apiKey       uint16
 	apiVersion   uint16
 	corelationID uint32
-	topics       []string
 	clientID     string
+	topicNames   []string
 }
 
 func (req *DescribeTopicPartitionsReq) Deserialize(request []byte) {
@@ -27,7 +28,7 @@ func (req *DescribeTopicPartitionsReq) Deserialize(request []byte) {
 	for i := 0; i < int(numOfTopics); i++ {
 		topicNameLength := request[position] - 1
 		topicName := request[position+1 : position+1+uint16(topicNameLength)]
-		req.topics = append(req.topics, string(topicName))
+		req.topicNames = append(req.topicNames, string(topicName))
 		position += uint16(topicNameLength) + 2
 	}
 }
@@ -36,15 +37,7 @@ type DescribeTopicPartitionsResp struct {
 	corelationID   uint32
 	throttleTimeMS uint32
 	numOfTopics    uint8
-	topics         []TopicDetails
-}
-
-type TopicDetails struct {
-	errorCode            API_ERROR_CODE
-	name                 string
-	ID                   string
-	isInternal           uint8
-	partitions           []struct{}
+	topics         []Topic
 }
 
 func (resp *DescribeTopicPartitionsResp) Serialize() []byte {
@@ -56,18 +49,7 @@ func (resp *DescribeTopicPartitionsResp) Serialize() []byte {
 	ret[9] = resp.numOfTopics + 1
 
 	for _, topic := range resp.topics {
-		serializedTopic := make([]byte, 2)
-
-		binary.BigEndian.PutUint16(serializedTopic, uint16(topic.errorCode))
-		serializedTopic = append(serializedTopic, byte(len(topic.name)+1))
-		serializedTopic = append(serializedTopic, topic.name...)
-		serializedTopic = append(serializedTopic, topic.ID...)
-		serializedTopic = append(serializedTopic, 0, 0, 0, 0) //  Topic Authorized Operations
-		serializedTopic = append(serializedTopic, topic.isInternal)
-		serializedTopic = append(serializedTopic, 1) // Empty partitions array
-		serializedTopic = append(serializedTopic, 0) // _tagged_fields
-
-		ret = append(ret, serializedTopic...)
+		ret = append(ret, topic.Serialize()...)
 	}
 
 	ret = append(ret, 0xFF) // Next Cursor
@@ -82,15 +64,16 @@ func HandleDescribeTopicPartitionsReq(req *DescribeTopicPartitionsReq) *Describe
 		throttleTimeMS: 0,
 	}
 
-	for _, topicName := range req.topics {
-		topic := TopicDetails{
-			errorCode:            UNKNOWN_TOPIC_OR_PARTITION,
-			name:                 topicName,
-			ID:                   string([]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}),
-			isInternal:           0,
-			partitions:           make([]struct{}, 0),
-		}
+	existingTopics := getExistingTopics()
 
+	for _, topicName := range req.topicNames {
+		var topic Topic
+		if topicIndex := slices.IndexFunc(existingTopics, func(t Topic) bool {return t.name == topicName}); topicIndex != -1 {
+			topic = existingTopics[topicIndex]
+		} else {
+			topic = NewUnknownTopic(topicName)
+		}
+		
 		resp.topics = append(resp.topics, topic)
 	}
 

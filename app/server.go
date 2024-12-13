@@ -24,6 +24,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Println("Listening on port 9029...")
+
 	server := NewServer()
 	server.listener = l
 	server.Accept()
