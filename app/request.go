@@ -15,6 +15,8 @@ func parseRequest(request []byte) (api.Deserializable, error) {
 		req = &api.APIVersionsReq{}
 	case uint16(api.DESCRIBE_TOPIC_PARTITIONS):
 		req = &api.DescribeTopicPartitionsReq{}
+	case uint16(api.FETCH):
+		req = &api.FetchReq{}
 	default:
 		return nil, fmt.Errorf("unknown api key: %v", apiKey)
 	}

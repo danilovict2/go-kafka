@@ -14,6 +14,8 @@ func parseResponse(req api.Deserializable) (api.Serializable, error) {
 		resp = api.HandleApiVersionsReq(request);
 	case *api.DescribeTopicPartitionsReq:
 		resp = api.HandleDescribeTopicPartitionsReq(request)
+	case *api.FetchReq:
+		resp = api.HandleFetchReq(request)
 	default:
 		return nil, fmt.Errorf("invalid request type: %T", resp)
 	}
