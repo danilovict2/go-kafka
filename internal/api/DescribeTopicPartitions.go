@@ -49,7 +49,7 @@ func (resp *DescribeTopicPartitionsResp) Serialize() []byte {
 	ret[9] = resp.numOfTopics + 1
 
 	for _, topic := range resp.topics {
-		ret = append(ret, topic.Serialize()...)
+		ret = append(ret, topic.SerializeForDescribeTopicPartitions()...)
 	}
 
 	ret = append(ret, 0xFF) // Next Cursor

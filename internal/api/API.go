@@ -12,6 +12,7 @@ const (
 const (
 	UNKNOWN_TOPIC_OR_PARTITION     API_ERROR_CODE = 3
 	UNSUPPORTED_VERSION_ERROR_CODE API_ERROR_CODE = 35
+	UNKNOWN_TOPIC                  API_ERROR_CODE = 100
 )
 
 type Serializable interface {
