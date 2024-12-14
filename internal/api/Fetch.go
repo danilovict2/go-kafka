@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"slices"
 )
 
 type FetchReq struct {
@@ -83,9 +85,21 @@ func HandleFetchReq(req *FetchReq) *FetchResp {
 		throttleTimeMS: 0,
 		errorCode:      0,
 		sessionID:      0,
-		responses:      req.topics,
+		responses:      make([]Topic, 0),
 	}
 
+	existingTopics := getExistingTopics()
+
+	for _, topic := range req.topics {
+		var response Topic
+		if topicIndex := slices.IndexFunc(existingTopics, func(t Topic) bool {return bytes.Equal(topic.uuid, t.uuid)}); topicIndex != -1 {
+			response = existingTopics[topicIndex]
+		} else {
+			response = topic
+		}
+		
+		resp.responses = append(resp.responses, response)
+	}
 	
 	return &resp
 }
