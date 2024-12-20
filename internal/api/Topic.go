@@ -1,6 +1,8 @@
 package api
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
 type Topic struct {
 	errorCode  API_ERROR_CODE
@@ -14,6 +16,7 @@ type Partition struct {
 	errorCode API_ERROR_CODE
 	ID        uint32
 	topicUuid []byte
+	batches   []RecordBatch
 }
 
 func (topic *Topic) SerializeForDescribeTopicPartitions() []byte {
@@ -73,13 +76,17 @@ func (partition *Partition) SerializeForFetch() []byte {
 
 	binary.BigEndian.PutUint32(serializedPartition, partition.ID)
 	binary.BigEndian.PutUint16(serializedPartition[4:], uint16(partition.errorCode))
-	serializedPartition = append(serializedPartition, 0, 0, 0, 0, 0, 0, 0, 0) // high_watermark
-	serializedPartition = append(serializedPartition, 0, 0, 0, 0, 0, 0, 0, 0) // last_stable_offset
-	serializedPartition = append(serializedPartition, 0, 0, 0, 0, 0, 0, 0, 0) // log_start_offset
-	serializedPartition = append(serializedPartition, 0)                      // _tagged_fields
-	serializedPartition = append(serializedPartition, 0, 0, 0, 0)             // preferred_read_replica
-	serializedPartition = append(serializedPartition, 1)                      // records
-	serializedPartition = append(serializedPartition, 0)                      // _tagged_fields
+	serializedPartition = append(serializedPartition, 0, 0, 0, 0, 0, 0, 0, 0)         // high_watermark
+	serializedPartition = append(serializedPartition, 0, 0, 0, 0, 0, 0, 0, 0)         // last_stable_offset
+	serializedPartition = append(serializedPartition, 0, 0, 0, 0, 0, 0, 0, 0)         // log_start_offset
+	serializedPartition = append(serializedPartition, 0)                              // _tagged_fields
+	serializedPartition = append(serializedPartition, 0, 0, 0, 0)                     // preferred_read_replica
+	serializedPartition = append(serializedPartition, byte(len(partition.batches)+1)) // records
+	for _, batch := range partition.batches {
+		serializedPartition = append(serializedPartition, batch.Serialize()...)
+	}
+
+	serializedPartition = append(serializedPartition, 0) // _tagged_fields
 
 	return serializedPartition
 }

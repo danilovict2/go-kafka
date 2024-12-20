@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	//"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -73,6 +74,7 @@ func (s *Server) Handle(conn net.Conn) {
 }
 
 func Send(conn net.Conn, message []byte) {
+	//fmt.Println(hex.EncodeToString(message))
 	binary.Write(conn, binary.BigEndian, int32(len(message)))
 	binary.Write(conn, binary.BigEndian, message)
 }

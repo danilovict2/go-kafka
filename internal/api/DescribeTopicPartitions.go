@@ -64,12 +64,12 @@ func HandleDescribeTopicPartitionsReq(req *DescribeTopicPartitionsReq) *Describe
 		throttleTimeMS: 0,
 	}
 
-	existingTopics := getExistingTopics()
+	topics := getClusterMetadataLogs("__cluster_metadata", 0).topics
 
 	for _, topicName := range req.topicNames {
 		var topic Topic
-		if topicIndex := slices.IndexFunc(existingTopics, func(t Topic) bool {return t.name == topicName}); topicIndex != -1 {
-			topic = existingTopics[topicIndex]
+		if idx := slices.IndexFunc(topics, func(t Topic) bool {return t.name == topicName}); idx != -1 {
+			topic = topics[idx]
 		} else {
 			topic = NewUnknownTopic(topicName)
 		}

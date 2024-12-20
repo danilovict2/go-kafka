@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"slices"
 )
 
@@ -35,14 +34,14 @@ func (req *FetchReq) Deserialize(request []byte) {
 		pos += 16
 		partitionsLength := int(request[pos] - 1)
 		pos += 1
-		
+
 		for j := 0; j < partitionsLength; j++ {
 			partition := Partition{
 				ID:        binary.BigEndian.Uint32(request[pos:]),
 				topicUuid: topic.uuid,
 				errorCode: UNKNOWN_TOPIC,
 			}
-			
+
 			pos += 33 // ID + currently irrelevant data
 			topic.partitions = append(topic.partitions, partition)
 		}
@@ -75,7 +74,6 @@ func (resp *FetchResp) Serialize() []byte {
 
 	ret = append(ret, 0) // _tagged_fields
 
-	fmt.Println(ret)
 	return ret
 }
 
@@ -88,18 +86,31 @@ func HandleFetchReq(req *FetchReq) *FetchResp {
 		responses:      make([]Topic, 0),
 	}
 
-	existingTopics := getExistingTopics()
+	cm := getClusterMetadataLogs("__cluster_metadata", 0)
 
-	for _, topic := range req.topics {
-		var response Topic
-		if topicIndex := slices.IndexFunc(existingTopics, func(t Topic) bool {return bytes.Equal(topic.uuid, t.uuid)}); topicIndex != -1 {
-			response = existingTopics[topicIndex]
-		} else {
-			response = topic
+	for _, requestTopic := range req.topics {
+		responseTopic := Topic{
+			name:       requestTopic.name,
+			uuid:       requestTopic.uuid,
+			partitions: []Partition{},
 		}
-		
-		resp.responses = append(resp.responses, response)
+
+		if idx := slices.IndexFunc(cm.topics, func(t Topic) bool { return bytes.Equal(t.uuid, requestTopic.uuid) }); idx != -1 {
+			topic := cm.topics[idx]
+			for i, partition := range topic.partitions {
+				partitionMetadata := getClusterMetadataLogs(topic.name, int(partition.ID))
+				responseTopic.partitions = append(responseTopic.partitions, Partition{
+					ID: uint32(i),
+					errorCode: 0,
+					batches: partitionMetadata.batches,
+				})
+			}
+		} else {
+			responseTopic.partitions = append(responseTopic.partitions, Partition{errorCode: UNKNOWN_TOPIC})
+		}
+
+		resp.responses = append(resp.responses, responseTopic)
 	}
-	
+
 	return &resp
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"hash/crc32"
 	"log"
 	"os"
 	"slices"
@@ -16,26 +17,30 @@ const (
 	FEATURE_LEVEL_RECORD byte = 12
 )
 
-func getExistingTopics() []Topic {
-	data, err := readClusterMetadata()
+type ClusterMetadata struct {
+	topics     []Topic
+	partitions []Partition
+	batches    []RecordBatch
+}
+
+func getClusterMetadataLogs(topicName string, partitionID int) ClusterMetadata {
+	data, err := readClusterMetadata(topicName, partitionID)
 	if err != nil {
 		log.Fatal("error reading __cluster_metadata", err)
 	}
 
 	topics := make([]Topic, 0)
 	partitions := make([]Partition, 0)
+	batches := make([]RecordBatch, 0)
 
 	pos := 0
 	for pos < len(data) {
-		pos += 8 // Base Offset
-		batchLength := binary.BigEndian.Uint32(data[pos:])
-		pos += 4 // Batch Length
+		batch := NewRecordBatch(data, pos)
 
-		batchPos := pos + 45 // Currently irrelevant data
-		recordsLength := binary.BigEndian.Uint32(data[batchPos:])
-		batchPos += 4 // Records length
+		pos += 12            // Batch offset and Batch Length
+		batchPos := pos + 49 // Skip batch info
 
-		for i := 0; i < int(recordsLength); i++ {
+		for i := 0; i < int(batch.recordsLength); i++ {
 			batchPos += 7 // Currently irrelevant data
 			batchType := data[batchPos]
 			batchPos += 2 // Currently irrelevant data
@@ -49,7 +54,7 @@ func getExistingTopics() []Topic {
 			case TOPIC_RECORD:
 				topic := Topic{errorCode: 0, isInternal: 0}
 				nameLength := int(data[batchPos])
-				topic.name = strings.Trim(string(data[batchPos : batchPos+nameLength]), string(rune(0x04)))
+				topic.name = strings.Trim(string(data[batchPos:batchPos+nameLength]), string(rune(0x04)))
 				batchPos += nameLength
 				topic.uuid = data[batchPos : batchPos+16]
 				batchPos += 20 // uuid + currently irrelevant data
@@ -60,12 +65,14 @@ func getExistingTopics() []Topic {
 				batchPos += 4
 				partition.topicUuid = data[batchPos : batchPos+16]
 				partitions = append(partitions, partition)
+
 				batchPos += 61 // uuid + currently irrelevant data
 			}
 
 		}
 
-		pos += int(batchLength)
+		batches = append(batches, batch)
+		pos += int(batch.length)
 	}
 
 	for _, partition := range partitions {
@@ -75,14 +82,52 @@ func getExistingTopics() []Topic {
 		}
 	}
 
-	return topics
+	return ClusterMetadata{
+		topics: topics,
+		partitions: partitions,
+		batches: batches,
+	}
 }
 
-func readClusterMetadata() ([]byte, error) {
-	content, err := os.ReadFile("/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log")
+func readClusterMetadata(topicName string, partitionID int) ([]byte, error) {
+	data, err := os.ReadFile(fmt.Sprintf("/tmp/kraft-combined-logs/%s-%d/00000000000000000000.log", topicName, partitionID))
 	if err != nil {
 		return []byte{}, err
 	}
 
-	return content, nil
+	return data, nil
+}
+
+func NewRecordBatch(data []byte, offset int) RecordBatch {
+	pos := 0
+	batch := RecordBatch{}
+	batch.baseOffset = binary.BigEndian.Uint64(data[offset:])
+	pos += 8
+	batch.length = binary.BigEndian.Uint32(data[pos+offset:])
+	pos += 4
+	batch.partitionLeaderEpoch = binary.BigEndian.Uint32(data[pos+offset:])
+	pos += 4
+	batch.magicByte = data[pos]
+	pos += 5 // magic byte + crc
+	afterCrcPos := pos
+	batch.attributes = binary.BigEndian.Uint16(data[pos+offset:])
+	pos += 2
+	batch.lastOffsetDelta = binary.BigEndian.Uint32(data[pos+offset:])
+	pos += 4
+	batch.baseTimestamp = binary.BigEndian.Uint64(data[pos+offset:])
+	pos += 8
+	batch.maxTimestamp = binary.BigEndian.Uint64(data[pos+offset:])
+	pos += 8
+	batch.producerID = binary.BigEndian.Uint64(data[pos+offset:])
+	pos += 8
+	batch.producerEpoch = binary.BigEndian.Uint16(data[pos+offset:])
+	pos += 2
+	batch.baseSequence = binary.BigEndian.Uint32(data[pos+offset:])
+	pos += 4
+	batch.recordsLength = binary.BigEndian.Uint32(data[pos+offset:])
+	pos += 4
+	batch.records = append(batch.records, data[pos+offset:int(batch.length)+12+offset]...)
+	batch.crc = crc32.Checksum(batch.Serialize()[afterCrcPos:], crc32.MakeTable(crc32.Castagnoli))
+
+	return batch
 }
