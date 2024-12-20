@@ -99,11 +99,13 @@ func HandleFetchReq(req *FetchReq) *FetchResp {
 			topic := cm.topics[idx]
 			for i, partition := range topic.partitions {
 				partitionMetadata := getClusterMetadataLogs(topic.name, int(partition.ID))
-				responseTopic.partitions = append(responseTopic.partitions, Partition{
-					ID: uint32(i),
-					errorCode: 0,
-					batches: partitionMetadata.batches,
-				})
+				if len(partitionMetadata.batches) > 0 || len(responseTopic.partitions) < 1 {
+					responseTopic.partitions = append(responseTopic.partitions, Partition{
+						ID:        uint32(i),
+						errorCode: 0,
+						batches:   partitionMetadata.batches,
+					})
+				}
 			}
 		} else {
 			responseTopic.partitions = append(responseTopic.partitions, Partition{errorCode: UNKNOWN_TOPIC})
